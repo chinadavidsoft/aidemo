@@ -13,6 +13,7 @@ import java.util.List;
 
 import org.example.config.ChatConfig;
 import org.example.model.ChatMessage;
+import org.example.model.PromptMode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,9 +36,14 @@ public final class DeepSeekChatClient implements StreamingChatClient {
     }
 
     @Override
-    public String streamReply(String apiKey, List<ChatMessage> history, String userPrompt, TokenSink tokenSink)
+    public String streamReply(
+            String apiKey,
+            List<ChatMessage> history,
+            PromptMode promptMode,
+            String userPrompt,
+            TokenSink tokenSink)
             throws IOException, InterruptedException {
-        String payload = buildPayload(mapper, config.model(), history, userPrompt);
+        String payload = buildPayload(mapper, config.model(), history, promptMode, userPrompt);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(config.apiBase() + config.chatPath()))
@@ -81,12 +87,23 @@ public final class DeepSeekChatClient implements StreamingChatClient {
         return assistant.toString();
     }
 
-    static String buildPayload(ObjectMapper mapper, String model, List<ChatMessage> history, String userPrompt)
+    static String buildPayload(
+            ObjectMapper mapper,
+            String model,
+            List<ChatMessage> history,
+            PromptMode promptMode,
+            String userPrompt)
             throws IOException {
         ObjectNode root = mapper.createObjectNode();
         root.put("model", model);
 
         ArrayNode messages = root.putArray("messages");
+        String systemPrompt = promptMode == null ? null : promptMode.systemPrompt();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            ObjectNode system = messages.addObject();
+            system.put("role", "system");
+            system.put("content", systemPrompt);
+        }
         for (ChatMessage message : history) {
             ObjectNode node = messages.addObject();
             node.put("role", message.role());

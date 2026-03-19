@@ -8,11 +8,17 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 import org.example.client.StreamingChatClient;
+import org.example.model.PromptMode;
 import org.example.service.ChatSession;
 
 public final class ConsoleChatRunner {
     private static final String COMMAND_CLEAR = "/clear";
     private static final String COMMAND_EXIT = "/exit";
+    private static final String COMMAND_MODE = "/mode";
+    private static final String MODE_ROLE = "role";
+    private static final String MODE_NORMAL = "normal";
+    private static final String MODE_USAGE = "Usage: /mode role <身份文本> | /mode normal";
+    private static final String MODE_SWITCH_CLEAR_NOTICE = "[context cleared due to mode change]";
 
     private final ChatSession session;
     private final StreamingChatClient chatClient;
@@ -56,11 +62,15 @@ public final class ConsoleChatRunner {
                 out.println("[context cleared]");
                 continue;
             }
+            if (trimmed.startsWith(COMMAND_MODE)) {
+                handleModeCommand(trimmed);
+                continue;
+            }
 
             out.print("assistant> ");
             out.flush();
             try {
-                String assistant = chatClient.streamReply(apiKey, session.snapshot(), trimmed, token -> {
+                String assistant = chatClient.streamReply(apiKey, session.snapshot(), session.promptMode(), trimmed, token -> {
                     out.print(token);
                     out.flush();
                 });
@@ -76,5 +86,37 @@ public final class ConsoleChatRunner {
                 err.println("Request failed: " + ex.getMessage());
             }
         }
+    }
+
+    private void handleModeCommand(String commandLine) {
+        if ((COMMAND_MODE + " " + MODE_NORMAL).equals(commandLine)) {
+            applyPromptMode(PromptMode.normal());
+            return;
+        }
+
+        String rolePrefix = COMMAND_MODE + " " + MODE_ROLE;
+        if (commandLine.equals(rolePrefix) || commandLine.startsWith(rolePrefix + " ")) {
+            String identity = commandLine.length() <= rolePrefix.length()
+                    ? ""
+                    : commandLine.substring(rolePrefix.length()).trim();
+            if (identity.isEmpty()) {
+                err.println(MODE_USAGE);
+                return;
+            }
+            applyPromptMode(PromptMode.role(identity));
+            return;
+        }
+
+        err.println(MODE_USAGE);
+    }
+
+    private void applyPromptMode(PromptMode newMode) {
+        PromptMode oldMode = session.promptMode();
+        if (!newMode.equals(oldMode)) {
+            session.clear();
+            out.println(MODE_SWITCH_CLEAR_NOTICE);
+        }
+        session.setPromptMode(newMode);
+        out.println("[mode=" + session.promptMode().display() + "]");
     }
 }

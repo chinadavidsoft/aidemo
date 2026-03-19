@@ -8,6 +8,8 @@
 - 会话上下文在进程内持续保留
 - `/clear` 手动清空上下文
 - `/exit` 或 `Ctrl+D` 退出
+- `/mode role <身份文本>` 启用身份回答模式
+- `/mode normal` 恢复默认回答模式
 - 真实 SSE 流式输出（边接收边打印）
 
 ## 环境要求
@@ -46,6 +48,9 @@ you>
 
 - `/clear`：清空当前会话历史
 - `/exit`：退出程序
+- `/mode role <身份文本>`：切换为身份回答模式（持续生效）
+- `/mode normal`：切回普通模式
+- 切换 `/mode` 到新模式时会自动清空历史，避免旧角色上下文污染
 - 空行：忽略，不发送请求
 
 ## 在 IDEA 直接启动
@@ -74,7 +79,8 @@ src/main/java/org/example
 │   ├── ApiKeyProvider.java       # API Key 读取
 │   └── ChatConfig.java           # 配置对象
 ├── model
-│   └── ChatMessage.java          # 消息模型
+│   ├── ChatMessage.java          # 消息模型
+│   └── PromptMode.java           # prompt 模式模型（normal/role）
 └── service
     └── ChatSession.java          # 会话历史管理
 ```
@@ -88,5 +94,6 @@ mvn test
 当前测试覆盖：
 
 - CLI 参数与 usage
+- `/mode` 命令与模式持久化行为
 - 流式请求 payload 组装
 - SSE delta 内容解析（含错误分支）

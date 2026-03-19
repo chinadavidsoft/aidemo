@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.example.model.ChatMessage;
+import org.example.model.PromptMode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,9 +15,14 @@ import junit.framework.TestCase;
 public class DeepSeekChatClientTest extends TestCase {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public void testBuildPayloadIncludesHistoryAndStreaming() throws IOException {
+    public void testBuildPayloadNormalModeIncludesHistoryAndStreaming() throws IOException {
         List<ChatMessage> history = Collections.singletonList(new ChatMessage("assistant", "hello"));
-        String payload = DeepSeekChatClient.buildPayload(MAPPER, "deepseek-chat", history, "next question");
+        String payload = DeepSeekChatClient.buildPayload(
+                MAPPER,
+                "deepseek-chat",
+                history,
+                PromptMode.normal(),
+                "next question");
 
         JsonNode root = MAPPER.readTree(payload);
         assertEquals("deepseek-chat", root.path("model").asText());
@@ -28,6 +34,25 @@ public class DeepSeekChatClientTest extends TestCase {
         assertEquals("hello", messages.get(0).path("content").asText());
         assertEquals("user", messages.get(1).path("role").asText());
         assertEquals("next question", messages.get(1).path("content").asText());
+    }
+
+    public void testBuildPayloadRoleModePrependsSystemPrompt() throws IOException {
+        List<ChatMessage> history = Collections.singletonList(new ChatMessage("assistant", "hello"));
+        String payload = DeepSeekChatClient.buildPayload(
+                MAPPER,
+                "deepseek-chat",
+                history,
+                PromptMode.role("资深架构师"),
+                "next question");
+
+        JsonNode root = MAPPER.readTree(payload);
+        JsonNode messages = root.path("messages");
+        assertEquals(3, messages.size());
+        assertEquals("system", messages.get(0).path("role").asText());
+        assertTrue(messages.get(0).path("content").asText().contains("资深架构师"));
+        assertTrue(messages.get(0).path("content").asText().contains("不要沿用先前身份"));
+        assertEquals("assistant", messages.get(1).path("role").asText());
+        assertEquals("user", messages.get(2).path("role").asText());
     }
 
     public void testExtractDeltaContentTextAndArray() throws IOException {
