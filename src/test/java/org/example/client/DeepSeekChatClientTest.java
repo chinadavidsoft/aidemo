@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.example.model.ChatMessage;
+import org.example.model.OutputFormat;
 import org.example.model.PromptMode;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +23,7 @@ public class DeepSeekChatClientTest extends TestCase {
                 "deepseek-chat",
                 history,
                 PromptMode.normal(),
+                OutputFormat.normal(),
                 "next question");
 
         JsonNode root = MAPPER.readTree(payload);
@@ -43,6 +45,7 @@ public class DeepSeekChatClientTest extends TestCase {
                 "deepseek-chat",
                 history,
                 PromptMode.role("资深架构师"),
+                OutputFormat.normal(),
                 "next question");
 
         JsonNode root = MAPPER.readTree(payload);
@@ -53,6 +56,43 @@ public class DeepSeekChatClientTest extends TestCase {
         assertTrue(messages.get(0).path("content").asText().contains("不要沿用先前身份"));
         assertEquals("assistant", messages.get(1).path("role").asText());
         assertEquals("user", messages.get(2).path("role").asText());
+    }
+
+    public void testBuildPayloadJsonFormatAddsSystemPrompt() throws IOException {
+        String payload = DeepSeekChatClient.buildPayload(
+                MAPPER,
+                "deepseek-chat",
+                Collections.emptyList(),
+                PromptMode.normal(),
+                OutputFormat.json(),
+                "next question");
+
+        JsonNode root = MAPPER.readTree(payload);
+        JsonNode messages = root.path("messages");
+        assertEquals(2, messages.size());
+        assertEquals("system", messages.get(0).path("role").asText());
+        assertTrue(messages.get(0).path("content").asText().contains("请仅输出合法 JSON"));
+        assertTrue(messages.get(0).path("content").asText().contains("忽略历史中与当前格式冲突的示例"));
+        assertEquals("user", messages.get(1).path("role").asText());
+    }
+
+    public void testBuildPayloadRoleAndFormatCombineIntoSingleSystemPrompt() throws IOException {
+        String payload = DeepSeekChatClient.buildPayload(
+                MAPPER,
+                "deepseek-chat",
+                Collections.emptyList(),
+                PromptMode.role("资深架构师"),
+                OutputFormat.md(),
+                "next question");
+
+        JsonNode root = MAPPER.readTree(payload);
+        JsonNode messages = root.path("messages");
+        assertEquals(2, messages.size());
+        assertEquals("system", messages.get(0).path("role").asText());
+        String system = messages.get(0).path("content").asText();
+        assertTrue(system.contains("资深架构师"));
+        assertTrue(system.contains("当前输出格式固定为 Markdown"));
+        assertTrue(system.contains("不要输出裸 JSON 对象"));
     }
 
     public void testExtractDeltaContentTextAndArray() throws IOException {

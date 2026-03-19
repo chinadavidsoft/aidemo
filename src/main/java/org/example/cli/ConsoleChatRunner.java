@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 import org.example.client.StreamingChatClient;
+import org.example.model.OutputFormat;
 import org.example.model.PromptMode;
 import org.example.service.ChatSession;
 
@@ -15,9 +16,14 @@ public final class ConsoleChatRunner {
     private static final String COMMAND_CLEAR = "/clear";
     private static final String COMMAND_EXIT = "/exit";
     private static final String COMMAND_MODE = "/mode";
+    private static final String COMMAND_FORMAT = "/format";
     private static final String MODE_ROLE = "role";
     private static final String MODE_NORMAL = "normal";
     private static final String MODE_USAGE = "Usage: /mode role <身份文本> | /mode normal";
+    private static final String FORMAT_NORMAL = "normal";
+    private static final String FORMAT_MD = "md";
+    private static final String FORMAT_JSON = "json";
+    private static final String FORMAT_USAGE = "Usage: /format json | /format md | /format normal";
     private static final String MODE_SWITCH_CLEAR_NOTICE = "[context cleared due to mode change]";
 
     private final ChatSession session;
@@ -66,14 +72,24 @@ public final class ConsoleChatRunner {
                 handleModeCommand(trimmed);
                 continue;
             }
+            if (trimmed.startsWith(COMMAND_FORMAT)) {
+                handleFormatCommand(trimmed);
+                continue;
+            }
 
             out.print("assistant> ");
             out.flush();
             try {
-                String assistant = chatClient.streamReply(apiKey, session.snapshot(), session.promptMode(), trimmed, token -> {
-                    out.print(token);
-                    out.flush();
-                });
+                String assistant = chatClient.streamReply(
+                        apiKey,
+                        session.snapshot(),
+                        session.promptMode(),
+                        session.outputFormat(),
+                        trimmed,
+                        token -> {
+                            out.print(token);
+                            out.flush();
+                        });
                 out.println();
                 session.addRound(trimmed, assistant);
             } catch (InterruptedException ex) {
@@ -108,6 +124,23 @@ public final class ConsoleChatRunner {
         }
 
         err.println(MODE_USAGE);
+    }
+
+    private void handleFormatCommand(String commandLine) {
+        String[] parts = commandLine.split("\\s+");
+        if (parts.length != 2) {
+            err.println(FORMAT_USAGE);
+            return;
+        }
+
+        String format = parts[1];
+        if (FORMAT_NORMAL.equals(format) || FORMAT_MD.equals(format) || FORMAT_JSON.equals(format)) {
+            session.setOutputFormat(OutputFormat.fromType(format));
+            out.println("[format=" + session.outputFormat().display() + "]");
+            return;
+        }
+
+        err.println(FORMAT_USAGE);
     }
 
     private void applyPromptMode(PromptMode newMode) {

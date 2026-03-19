@@ -10,6 +10,7 @@
 - `/exit` 或 `Ctrl+D` 退出
 - `/mode role <身份文本>` 启用身份回答模式
 - `/mode normal` 恢复默认回答模式
+- `/format json|md|normal` 设置输出格式模式
 - 真实 SSE 流式输出（边接收边打印）
 
 ## 环境要求
@@ -50,7 +51,11 @@ you>
 - `/exit`：退出程序
 - `/mode role <身份文本>`：切换为身份回答模式（持续生效）
 - `/mode normal`：切回普通模式
+- `/format json`：切到 JSON 输出模式（持续生效）
+- `/format md`：切到 Markdown 输出模式（持续生效）
+- `/format normal`：关闭格式约束，恢复默认输出
 - 切换 `/mode` 到新模式时会自动清空历史，避免旧角色上下文污染
+- 切换 `/format` 不会清空历史，格式模式可与 `/mode` 同时生效
 - 空行：忽略，不发送请求
 
 ## 在 IDEA 直接启动

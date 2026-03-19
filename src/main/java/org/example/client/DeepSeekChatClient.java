@@ -13,6 +13,7 @@ import java.util.List;
 
 import org.example.config.ChatConfig;
 import org.example.model.ChatMessage;
+import org.example.model.OutputFormat;
 import org.example.model.PromptMode;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -40,10 +41,11 @@ public final class DeepSeekChatClient implements StreamingChatClient {
             String apiKey,
             List<ChatMessage> history,
             PromptMode promptMode,
+            OutputFormat outputFormat,
             String userPrompt,
             TokenSink tokenSink)
             throws IOException, InterruptedException {
-        String payload = buildPayload(mapper, config.model(), history, promptMode, userPrompt);
+        String payload = buildPayload(mapper, config.model(), history, promptMode, outputFormat, userPrompt);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(config.apiBase() + config.chatPath()))
@@ -92,13 +94,14 @@ public final class DeepSeekChatClient implements StreamingChatClient {
             String model,
             List<ChatMessage> history,
             PromptMode promptMode,
+            OutputFormat outputFormat,
             String userPrompt)
             throws IOException {
         ObjectNode root = mapper.createObjectNode();
         root.put("model", model);
 
         ArrayNode messages = root.putArray("messages");
-        String systemPrompt = promptMode == null ? null : promptMode.systemPrompt();
+        String systemPrompt = buildSystemPrompt(promptMode, outputFormat);
         if (systemPrompt != null && !systemPrompt.isEmpty()) {
             ObjectNode system = messages.addObject();
             system.put("role", "system");
@@ -115,6 +118,26 @@ public final class DeepSeekChatClient implements StreamingChatClient {
 
         root.put("stream", true);
         return mapper.writeValueAsString(root);
+    }
+
+    private static String buildSystemPrompt(PromptMode promptMode, OutputFormat outputFormat) {
+        String promptModeInstruction = promptMode == null ? null : promptMode.systemPrompt();
+        String outputFormatInstruction = outputFormat == null ? null : outputFormat.systemPrompt();
+
+        if (isBlank(promptModeInstruction) && isBlank(outputFormatInstruction)) {
+            return null;
+        }
+        if (isBlank(promptModeInstruction)) {
+            return outputFormatInstruction;
+        }
+        if (isBlank(outputFormatInstruction)) {
+            return promptModeInstruction;
+        }
+        return promptModeInstruction + "\n" + outputFormatInstruction;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     static String extractDeltaContent(ObjectMapper mapper, String json) throws IOException {
